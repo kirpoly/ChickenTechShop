@@ -1,0 +1,28 @@
+fieldID,fieldName,fieldType,defaultValue,secondaryValue,fieldDescription,minValue,maxValue,tab
+cts_header_progression,Progression,Header,Tech Market Progression,,,,,Chicken Tech Shop
+cts_level_cost_1,Level 2 Cost,Int,250000,,"Credits needed to go from Tech Market level 1 to 2.",10000,5000000,Chicken Tech Shop
+cts_level_cost_2,Level 3 Cost,Int,500000,,"Credits needed to go from Tech Market level 2 to 3.",10000,5000000,Chicken Tech Shop
+cts_level_cost_3,Level 4 Cost,Int,900000,,"Credits needed to go from Tech Market level 3 to 4.",10000,8000000,Chicken Tech Shop
+cts_level_cost_4,Level 5 Cost,Int,1400000,,"Credits needed to go from Tech Market level 4 to 5.",10000,12000000,Chicken Tech Shop
+cts_mission_credit_mult,Mission Credit Multiplier,Double,0.35,,"Fraction of mission reward converted to Tech Market progression credits.",0,2,Chicken Tech Shop
+cts_spending_credit_mult,Spending Credit Multiplier,Double,0.25,,"Fraction of paid restock cost converted to Tech Market progression credits.",0,2,Chicken Tech Shop
+,,,,,,,,
+cts_header_pricing,Pricing,Header,Submarket Pricing,,,,,Chicken Tech Shop
+cts_tariff_neutral,Tariff Neutral,Double,4.0,,"Tariff value at neutral reputation.",0,8,Chicken Tech Shop
+cts_tariff_favorable,Tariff Favorable,Double,3.0,,"Tariff value at favorable reputation.",0,8,Chicken Tech Shop
+cts_tariff_welcoming,Tariff Welcoming,Double,2.5,,"Tariff value at welcoming reputation.",0,8,Chicken Tech Shop
+cts_tariff_friendly,Tariff Friendly,Double,2.2,,"Tariff value at friendly reputation.",0,8,Chicken Tech Shop
+cts_tariff_cooperative,Tariff Cooperative,Double,2.0,,"Tariff value at cooperative reputation.",0,8,Chicken Tech Shop
+cts_weapon_bp_price_mult,Weapon BP Price Mult,Double,3.0,,"Additional price multiplier for weapon blueprints in Chicken's market.",1,10,Chicken Tech Shop
+cts_fighter_bp_price_mult,Fighter BP Price Mult,Double,3.0,,"Additional price multiplier for fighter blueprints in Chicken's market.",1,10,Chicken Tech Shop
+cts_ship_bp_price_mult,Ship BP Price Mult,Double,1.2,,"Additional price multiplier for ship blueprints in Chicken's market.",1,10,Chicken Tech Shop
+cts_ai_core_price_mult,AI Core Price Mult,Double,1.1,,"Additional price multiplier for AI cores in Chicken's market.",1,10,Chicken Tech Shop
+cts_special_item_price_mult,Special Item Price Mult,Double,1.0,,"Additional price multiplier for non-blueprint special items in Chicken's market.",0,10,Chicken Tech Shop
+cts_modded_core_chance,Modded Core Chance,Double,0.0,,"Per-restock chance to add one random modded AI core commodity.",0,1,Chicken Tech Shop
+cts_modded_core_price_exp,Modded Core Price Weight,Double,1.0,,"This value is exponent X in weight = 1 / (price^X); higher X makes expensive modded cores rarer.",0,3,Chicken Tech Shop
+cts_modded_core_min_price,Modded Core Min Price,Int,10,,"Minimum base price for modded AI cores to be eligible for stock.",0,2000,Chicken Tech Shop
+,,,,,,,,
+cts_header_lucky,Premium Restock,Header,Lucky Restock,,,,,Chicken Tech Shop
+cts_lucky_min_level,Restock Unlock Level,Int,2,,"Minimum Tech Market level required before paid restock option appears.",1,5,Chicken Tech Shop
+cts_lucky_price_mean,Restock Price Mean,Int,200000,,"Average credit price for paid restock offers.",10000,2000000,Chicken Tech Shop
+cts_lucky_price_std,Restock Price StdDev,Int,50000,,"Standard deviation for paid restock price rolls.",0,1000000,Chicken Tech Shop

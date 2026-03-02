@@ -14,5 +14,6 @@ public class CTS_DeadDropMission extends DeadDropMission {
 		MarketAPI market = ChickenQuestUtils.getChickenMarket();
 		TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
 		submarket.addCreditsToTechMarket(creditReward);
+		submarket.updateCargoForce();
 	}
 }

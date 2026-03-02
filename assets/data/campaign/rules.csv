@@ -76,3 +76,20 @@ SetTextHighlights $cts_bpbuy_count","""I currently have $cts_bpbuy_count bluepri
 I dont have much use for blueprints aside from selling them, but I wanted to give you the first chance to get them before my usual buyers.""","cts_bpbuy_view:See what $personName has to offer
 contact_decline:Decline",
 CTS_bpbuyOfferView,DialogOptionSelected,$option == cts_bpbuy_view,Call $cts_bpbuy_ref2 showBlueprintPackages,,,
+CTS_lrestockOption,PopulateOptions,"$id == chicken
+CTS_LuckyRestockInteraction canShow",,,cts_lrestock_start:Ask Chicken to refresh available stock,
+CTS_lrestockOfferText,DialogOptionSelected,$option == cts_lrestock_start,CTS_LuckyRestockInteraction prepare,"""I can call in favors and rotate the inventory ahead of schedule. Want me to make the call?""","cts_lrestock_buy:Pay for premium restock
+cts_lrestock_decline:Decline",
+CTS_lrestockOfferBuy,DialogOptionSelected,$option == cts_lrestock_buy,"CTS_LuckyRestockInteraction buy
+FireAll PopulateOptions","""Chicken checks the transfer, then gives a short nod. Done. I will rotate the inventory now.
+OR
+Chicken taps a sequence into his TriPad and glances up at you. Give it a moment; stock should look better.
+OR
+Chicken pockets the credits and leans back. Alright, fresh batch coming in.""",,,
+CTS_lrestockOfferDecline,DialogOptionSelected,$option == cts_lrestock_decline,"CTS_LuckyRestockInteraction decline
+FireAll PopulateOptions","""Chicken shrugs. No rush; offer stands if you change your mind.
+OR
+He gives a small nod. Fair enough, we can do it later.
+OR
+Chicken flicks off the TriPad screen. Your call, Captain.""",,,
+

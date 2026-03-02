@@ -1,0 +1,45 @@
+{
+  "level_costs": [250000, 500000, 900000, 1400000],
+  "mission_credit_contribution": 0.35,
+  "spending_credit_contribution": 0.25,
+
+  "special_item_pool_fraction": [0.10, 0.15, 0.20, 0.25, 0.30],
+  "blueprint_pool_fraction": [0.02, 0.04, 0.06, 0.08, 0.10],
+  "blueprint_max_weapons": [2, 3, 4, 5, 6],
+  "blueprint_max_fighters": [1, 2, 3, 4, 5],
+  "blueprint_max_ships": [1, 2, 2, 3, 4],
+
+  "ai_gamma_base": [2, 4, 6, 8, 8],
+  "ai_beta_base": [1, 2, 3, 4, 4],
+  "ai_alpha_base": [0, 0, 1, 2, 3],
+  "ai_core_random_delta": 1,
+  "modded_ai_core_restock_chance": 0.0,
+  "modded_ai_core_price_weight_exponent": 1.0,
+  "modded_ai_core_min_base_price": 10,
+  "modded_ai_core_min_qty": 1,
+  "modded_ai_core_max_qty": 1,
+
+  "tariff_neutral": 4.0,
+  "tariff_favorable": 3.0,
+  "tariff_welcoming": 2.5,
+  "tariff_friendly": 2.2,
+  "tariff_cooperative": 2.0,
+
+  "weapon_bp_price_mult": 3.0,
+  "fighter_bp_price_mult": 3.0,
+  "ship_bp_price_mult": 1.2,
+  "ai_core_price_mult": 1.1,
+  "special_item_price_mult": 1.0,
+
+  "lucky_restock_min_level": 2,
+  "lucky_price_mean": 200000,
+  "lucky_price_std": 50000,
+  "lucky_price_floor": 25000,
+  "lucky_special_extra_picks_low_level": 1,
+  "lucky_special_extra_picks_high_level": 2,
+  "lucky_special_qty2_chance": 0.75,
+  "lucky_special_qty3_chance_level5": 0.20,
+  "lucky_core_bonus_per_unlocked_tier": 1,
+  "lucky_bp_bonus_extra_min": 1,
+  "lucky_bp_bonus_extra_max": 2
+}

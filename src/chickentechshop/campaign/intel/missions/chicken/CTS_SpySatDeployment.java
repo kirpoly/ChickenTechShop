@@ -46,5 +46,6 @@ public class CTS_SpySatDeployment extends SpySatDeployment {
 		MarketAPI market = ChickenQuestUtils.getChickenMarket();
 		TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
 		submarket.addCreditsToTechMarket(creditReward);
+		submarket.updateCargoForce();
 	}
 }

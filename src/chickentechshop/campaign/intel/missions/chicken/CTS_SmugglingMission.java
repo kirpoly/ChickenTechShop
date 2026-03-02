@@ -14,5 +14,6 @@ public class CTS_SmugglingMission extends SmugglingMission {
 		MarketAPI market = ChickenQuestUtils.getChickenMarket();
 		TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
 		submarket.addCreditsToTechMarket(creditReward);
+		submarket.updateCargoForce();
 	}
 }

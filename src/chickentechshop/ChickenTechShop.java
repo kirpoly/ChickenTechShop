@@ -18,6 +18,8 @@ import com.fs.starfarer.api.impl.campaign.intel.misc.BreadcrumbIntel;
 
 import chickentechshop.campaign.intel.TechMarketContact;
 import chickentechshop.campaign.intel.missions.chicken.ChickenQuestUtils;
+import chickentechshop.campaign.submarkets.TechMarket;
+import chickentechshop.config.CTS_Config;
 
 public class ChickenTechShop extends BaseModPlugin {
 
@@ -86,12 +88,19 @@ public class ChickenTechShop extends BaseModPlugin {
 
     @Override
     public void onGameLoad(boolean newGame) {
+        CTS_Config.reload();
         //I'm adding this to fix the bug since chicken doesn't exist at later-game save
         //Idk if it's the correct fix since this line adds chicken
         chickenInitialSetup();
         
         MarketAPI market = Global.getSector().getImportantPeople().getPerson(ChickenQuestUtils.PERSON_CHICKEN)
                 .getMarket();
+
+        if (market != null && market.hasSubmarket("chicken_market")) {
+            TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
+            submarket.migrateProgressionDataNow();
+        }
+
         final SectorAPI sector = Global.getSector();
 
         if (sector != null && sector.getListenerManager() != null) {
@@ -106,6 +115,7 @@ public class ChickenTechShop extends BaseModPlugin {
 
     @Override
     public void onNewGameAfterTimePass() {
+        CTS_Config.reload();
         chickenInitialSetup();
         final SectorAPI sector = Global.getSector();
         MarketAPI market = Global.getSector().getImportantPeople().getPerson(ChickenQuestUtils.PERSON_CHICKEN)
