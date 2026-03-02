@@ -1,3 +1,14 @@
+Version 0.1.6
+    Changes:
+        - Major tech market balance/progression rework with config-driven tuning (JSON + LunaLib support)
+        - Added premium "Lucky Restock" interaction/dialog for Chicken
+        - Unified and refactored restock generation logic across categories (special items, cores, blueprints)
+        - Added item pool caching to improve restock performance on large modlists
+        - Fixed multiple stability issues around Chicken/contact/submarket lookup and mission rewards
+        - Mission rewards now use shared handling
+        - Improved save migration for progression costs when config values change
+        - Added Linux case-sensitivity fix and general cleanup of mission/rule command code
+
 Version 0.1.5
     Changes:
         - Update to Starsector 0.98a-RC5 - Now with Java 17!
