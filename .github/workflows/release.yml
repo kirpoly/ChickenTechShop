@@ -1,45 +1,51 @@
 name: GitHub Release
 
 on:
-  # Triggers the workflow on pushing a tag only
   push:
-    tags: "*"
-    branches:
-      - "!*"
-
-  # Allows you to run this workflow manually from the Actions tab
+    tags:
+      - "*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build:
-    # The type of runner that the job will run on
+  release:
     runs-on: ubuntu-latest
 
     steps:
-      # Checks-out repository under $GITHUB_WORKSPACE, so your job can access it
-      # GitHub Actions by default doesn't check out tags, so make sure those are included
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           lfs: true
 
-      - name: Fetch Tags
-        run: git fetch --prune --unshallow --tags
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
 
-      - name: Set Variables
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582
+
+      - name: Set release metadata
+        shell: bash
         run: |
-          echo "VERSION=$(git describe --tags)" >> $GITHUB_ENV
-          git log --format=%B -n 1 $(git log -1 --pretty=format:"%h") | cat - > changes.txt
+          if [[ -n "${GITHUB_REF_NAME}" ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="$(git describe --tags --abbrev=0)"
+          fi
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          git log -1 --pretty=%B > changes.txt
 
-      - name: Create Mod Zipfile
-        run: |
-          git lfs install 
-          git lfs fetch
-          git lfs checkout
-          ./gradlew release
+      - name: Build release zip
+        shell: bash
+        run: ./gradlew --no-daemon release
 
-      - name: Publish Release on GitHub
-        uses: "ncipollo/release-action@v1"
+      - name: Publish release
+        uses: ncipollo/release-action@v1
         with:
           name: ${{ env.VERSION }}
           tag: ${{ env.VERSION }}
@@ -47,4 +53,4 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: "ChickenTechShop*.zip"
+          artifacts: "ChickenTechShop-*.zip"
