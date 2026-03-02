@@ -12,4 +12,4 @@ Tech Market Improvements:
     - Player should see actual final price (deal with implicit crutch with post-transaction money reduction)
     - Take into account Chicken contact standing, not only tech level
     - Balance adjustments
-    - Modded techs?
+    - Modded techs other than with "pather4", "hist3t" tags?
