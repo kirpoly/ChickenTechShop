@@ -9,6 +9,7 @@ import com.fs.starfarer.api.campaign.RepLevel;
 import com.fs.starfarer.api.campaign.SpecialItemData;
 import com.fs.starfarer.api.campaign.SpecialItemSpecAPI;
 import com.fs.starfarer.api.campaign.econ.CommoditySpecAPI;
+import com.fs.starfarer.api.characters.PersonAPI;
 import com.fs.starfarer.api.combat.ShipHullSpecAPI;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
 import com.fs.starfarer.api.impl.campaign.ids.Commodities;
@@ -25,6 +26,7 @@ import com.fs.starfarer.api.util.WeightedRandomPicker;
 import chickentechshop.config.CTS_Config;
 import chickentechshop.campaign.intel.missions.chicken.ChickenQuestUtils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +55,28 @@ public class TechMarket extends BaseSubmarketPlugin {
     private static final int LUCKY_CATEGORY_WEAPON_BPS = 3;
     private static final int LUCKY_CATEGORY_FIGHTER_BPS = 4;
     private static final int LUCKY_CATEGORY_SHIP_BPS = 5;
+    private static final List<String> VANILLA_SPECIAL_ITEM_TAGS = Arrays.asList("pather4", "hist3t");
+    private static final Set<String> DIY_PLANETS_SPECIAL_ITEM_IDS = new HashSet<String>(Arrays.asList(
+            "atmo_mineralizer", "atmo_sublimator", "solar_reflector",
+            "tectonic_attenuator", "weather_core", "climate_sculptor", "gravity_oscillator", "rad_remover"));
+
+    private static final Object ITEM_POOL_LOCK = new Object();
+    private static List<String> cachedSpecialItemIds;
+    private static List<String> cachedWeaponBlueprintIds;
+    private static List<String> cachedFighterBlueprintIds;
+    private static List<String> cachedShipBlueprintIds;
+    private static List<ModdedAiCoreCandidate> cachedModdedAiCoreCandidates;
+    private static int cachedModdedAiCoreMinBasePrice = Integer.MIN_VALUE;
+
+    private static final class ModdedAiCoreCandidate {
+        private final String commodityId;
+        private final float basePrice;
+
+        private ModdedAiCoreCandidate(String commodityId, float basePrice) {
+            this.commodityId = commodityId;
+            this.basePrice = basePrice;
+        }
+    }
 
     public int getTechMarketLevel() {
         return techMarketLevel;
@@ -60,6 +84,17 @@ public class TechMarket extends BaseSubmarketPlugin {
 
     private CTS_Config cfg() {
         return CTS_Config.get();
+    }
+
+    public static void invalidateItemPools() {
+        synchronized (ITEM_POOL_LOCK) {
+            cachedSpecialItemIds = null;
+            cachedWeaponBlueprintIds = null;
+            cachedFighterBlueprintIds = null;
+            cachedShipBlueprintIds = null;
+            cachedModdedAiCoreCandidates = null;
+            cachedModdedAiCoreMinBasePrice = Integer.MIN_VALUE;
+        }
     }
 
     // Tech Market can be 1 to 5 inclusive
@@ -84,9 +119,18 @@ public class TechMarket extends BaseSubmarketPlugin {
         if (techMarketLevel >= 5) {
             return;
         }
+        if (credits <= 0) {
+            return;
+        }
 
         float clampedMultiplier = Math.max(0f, contributionMultiplier);
-        int creditedAmount = Math.max(1, Math.round(credits * clampedMultiplier));
+        if (clampedMultiplier <= 0f) {
+            return;
+        }
+        int creditedAmount = Math.round(credits * clampedMultiplier);
+        if (creditedAmount <= 0) {
+            return;
+        }
         currentCredits += creditedAmount;
         while (techMarketLevel < 5 && currentCredits >= levelCosts[getTechMarketLevel() - 1]) {
             currentCredits -= levelCosts[getTechMarketLevel() - 1];
@@ -105,8 +149,8 @@ public class TechMarket extends BaseSubmarketPlugin {
     @Override
     public void updateCargoPrePlayerInteraction() {
         migrateProgressionDataIfNeeded();
-        // log.info("Days since update: " + sinceLastCargoUpdate);
-        if (sinceLastCargoUpdate < 30)
+        int restockIntervalDays = Math.max(1, cfg().restockIntervalDays);
+        if (sinceLastCargoUpdate < restockIntervalDays)
             return;
         sinceLastCargoUpdate = 0f;
         updateCargo();
@@ -121,63 +165,38 @@ public class TechMarket extends BaseSubmarketPlugin {
 
     public void updateCargo() {
         CargoAPI cargo = getCargo();
-        activeLuckyCategory = LUCKY_CATEGORY_NONE;
-        if (luckyRestockCharges > 0) {
-            activeLuckyCategory = queuedLuckyCategory;
-            luckyRestockCharges--;
-            if (luckyRestockCharges <= 0) {
-                queuedLuckyCategory = LUCKY_CATEGORY_NONE;
+        try {
+            activeLuckyCategory = LUCKY_CATEGORY_NONE;
+            if (luckyRestockCharges > 0) {
+                activeLuckyCategory = queuedLuckyCategory;
+                luckyRestockCharges--;
+                if (luckyRestockCharges <= 0) {
+                    queuedLuckyCategory = LUCKY_CATEGORY_NONE;
+                }
             }
+            ensureItemPoolsBuilt();
+            clearInventory(cargo);
+            addSpecialTech();
+            addAICores();
+            addBlueprints();
+            cargo.sort();
+        } finally {
+            activeLuckyCategory = LUCKY_CATEGORY_NONE;
         }
+    }
 
-        // clear inventory
+    private void clearInventory(CargoAPI cargo) {
         for (CargoStackAPI s : cargo.getStacksCopy()) {
             float qty = s.getSize();
             cargo.removeItems(s.getType(), s.getData(), qty);
         }
         cargo.removeEmptyStacks();
-        addSpecialTech();
-        addAICores();
-        addBlueprints();
-        cargo.sort();
-        activeLuckyCategory = LUCKY_CATEGORY_NONE;
     }
 
-    // addSpecialTech adds tech items to shop, such as colony items, AI cores and
-    // blueprints
-    // For now, just getting basic items to work!
     protected void addSpecialTech() {
         CargoAPI cargo = getCargo();
-        Set<String> vanillaSpecialItemsList = new HashSet<String>();
-        Set<String> diyPlanetsSpecialItemsList = new HashSet<String>();
-        Set<String> allSpecialItems = new HashSet<String>();
-        final List<String> vanillaItemTags = Arrays.asList("pather4", "hist3t");
-        final List<String> diyPlanetsItemIDs = Arrays.asList(
-                "atmo_mineralizer", "atmo_sublimator", "solar_reflector",
-                "tectonic_attenuator", "weather_core", "climate_sculptor", "gravity_oscillator", "rad_remover");
-
-        // Get all the items to add via tags or hardcoded ids
-        for (SpecialItemSpecAPI spec : Global.getSettings().getAllSpecialItemSpecs()) {
-            boolean hasVanillaTag = false;
-            for (String tag : vanillaItemTags) {
-                if (spec.hasTag(tag)) {
-                    hasVanillaTag = true;
-                    break;
-                }
-            }
-            if (hasVanillaTag) {
-                vanillaSpecialItemsList.add(spec.getId());
-                continue;
-            }
-            if (diyPlanetsItemIDs.contains(spec.getId())) {
-                diyPlanetsSpecialItemsList.add(spec.getId());
-            }
-        }
-        allSpecialItems.addAll(vanillaSpecialItemsList);
-        allSpecialItems.addAll(diyPlanetsSpecialItemsList);
-
         WeightedRandomPicker<String> randomSpecialPicker = new WeightedRandomPicker<>(itemGenRandom);
-        for (String itemId : allSpecialItems) {
+        for (String itemId : cachedSpecialItemIds) {
             randomSpecialPicker.add(itemId);
         }
 
@@ -186,18 +205,7 @@ public class TechMarket extends BaseSubmarketPlugin {
         for (int i = 0; i < itemPickerNum; i++) {
             if (!randomSpecialPicker.isEmpty()) {
                 String itemID = randomSpecialPicker.pickAndRemove();
-                int quantity = 1;
-                if (isLuckyCategory(LUCKY_CATEGORY_SPECIAL)) {
-                    if (itemGenRandom.nextFloat() < cfg().luckySpecialQty2Chance) {
-                        quantity = 2;
-                    }
-                    if (techMarketLevel >= 5 && itemGenRandom.nextFloat() < cfg().luckySpecialQty3ChanceAtLevel5) {
-                        quantity = 3;
-                    }
-                } else if (techMarketLevel >= 4 && itemGenRandom.nextFloat() < 0.35f) {
-                    quantity = 2;
-                }
-                log.info("Trying to add " + itemID + " with quantity " + quantity);
+                int quantity = rollSpecialItemQuantity();
                 cargo.addSpecial(new SpecialItemData(itemID, null), quantity);
             }
         }
@@ -211,10 +219,9 @@ public class TechMarket extends BaseSubmarketPlugin {
         final int[] gammaByLevel = cfg().aiGammaBase;
         final int[] betaByLevel = cfg().aiBetaBase;
         final int[] alphaByLevel = cfg().aiAlphaBase;
-        int levelIndex = techMarketLevel - 1;
-        int gamma = rollCoreQuantityAroundBase(gammaByLevel[levelIndex]);
-        int beta = rollCoreQuantityAroundBase(betaByLevel[levelIndex]);
-        int alpha = rollCoreQuantityAroundBase(alphaByLevel[levelIndex]);
+        int gamma = rollCoreQuantityAroundBase(getLevelValue(gammaByLevel, 0));
+        int beta = rollCoreQuantityAroundBase(getLevelValue(betaByLevel, 0));
+        int alpha = rollCoreQuantityAroundBase(getLevelValue(alphaByLevel, 0));
 
         if (isLuckyCategory(LUCKY_CATEGORY_AI_CORES)) {
             gamma += cfg().luckyCoreBonusPerUnlockedTier;
@@ -250,109 +257,172 @@ public class TechMarket extends BaseSubmarketPlugin {
     }
 
     protected void addWeaponBlueprints() {
-        CargoAPI cargo = getCargo();
-        List<WeaponSpecAPI> weaponSpecs = Global.getSettings().getAllWeaponSpecs();
-        WeightedRandomPicker<String> randomWeaponPicker = new WeightedRandomPicker<>(itemGenRandom);
-
-        for (WeaponSpecAPI spec : weaponSpecs) {
-            // Check if this is not a blueprint that should drop etc
-            if (!spec.hasTag("rare_bp") || spec.hasTag(Tags.NO_DROP) || spec.hasTag(Tags.NO_BP_DROP)) {
-                continue;
-            }
-            // Check if player already knows this weapon?
-            // if (Global.getSector().getPlayerFaction().knowsWeapon(spec.getWeaponId())) {
-            // continue;
-            // }
-            // Add the data to our picker
-            randomWeaponPicker.add(spec.getWeaponId());
-        }
-
-        // Now make our Blueprints
-        int itemPickerNum = getPicksFromPool(randomWeaponPicker.getItems().size(), cfg().blueprintPoolFraction,
-                cfg().blueprintMaxWeapons[techMarketLevel - 1]);
-        itemPickerNum = applyBlueprintBonusPicks(itemPickerNum, randomWeaponPicker.getItems().size(),
+        addBlueprintsFromPool(cachedWeaponBlueprintIds, Items.WEAPON_BP, cfg().blueprintMaxWeapons,
                 LUCKY_CATEGORY_WEAPON_BPS);
-        // log.info("randomWeaponPicker has " + randomWeaponPicker.getItems().size());
-        // log.info("num picked for weapons is " + itemPickerNum);
-        for (int i = 0; i < itemPickerNum; i++) {
-            if (!randomWeaponPicker.isEmpty()) {
-                String itemID = randomWeaponPicker.pickAndRemove();
-                // Only need 1 of each Blueprint
-                // log.info("Trying to add Weapon blueprint for " + itemID);
-                cargo.addSpecial(new SpecialItemData(Items.WEAPON_BP, itemID), 1);
-            }
-        }
     }
 
     protected void addWingsBlueprints() {
-        CargoAPI cargo = getCargo();
-        List<FighterWingSpecAPI> fighterSpecs = Global.getSettings().getAllFighterWingSpecs();
-        WeightedRandomPicker<String> randomFighterPicker = new WeightedRandomPicker<>(itemGenRandom);
+        addBlueprintsFromPool(cachedFighterBlueprintIds, Items.FIGHTER_BP, cfg().blueprintMaxFighters,
+                LUCKY_CATEGORY_FIGHTER_BPS);
+    }
 
-        for (FighterWingSpecAPI spec : fighterSpecs) {
-            // Check if this is not a blueprint that should drop etc
-            if (!spec.hasTag("rare_bp") || spec.hasTag(Tags.NO_DROP) || spec.hasTag(Tags.NO_BP_DROP)) {
-                continue;
-            }
-            // Check if player already knows this weapon?
-            // if (Global.getSector().getPlayerFaction().knowsWeapon(spec.getWeaponId())) {
-            // continue;
-            // }
-            // Add the data to our picker
-            randomFighterPicker.add(spec.getId());
+    protected void addShipsBlueprints() {
+        addBlueprintsFromPool(cachedShipBlueprintIds, Items.SHIP_BP, cfg().blueprintMaxShips,
+                LUCKY_CATEGORY_SHIP_BPS);
+    }
+
+    private void addBlueprintsFromPool(List<String> pool, String blueprintItemId, int[] levelCaps, int luckyCategory) {
+        CargoAPI cargo = getCargo();
+        WeightedRandomPicker<String> picker = new WeightedRandomPicker<>(itemGenRandom);
+        for (String id : pool) {
+            picker.add(id);
         }
 
-        // Now make our Blueprints
-        int itemPickerNum = getPicksFromPool(randomFighterPicker.getItems().size(), cfg().blueprintPoolFraction,
-                cfg().blueprintMaxFighters[techMarketLevel - 1]);
-        itemPickerNum = applyBlueprintBonusPicks(itemPickerNum, randomFighterPicker.getItems().size(),
-                LUCKY_CATEGORY_FIGHTER_BPS);
-        // log.info("randomFighterPicker has " + randomFighterPicker.getItems().size());
-        // log.info("num picked for fighters is " + itemPickerNum);
+        int levelCap = Math.max(0, getLevelValue(levelCaps, 0));
+        int itemPickerNum = getPicksFromPool(picker.getItems().size(), cfg().blueprintPoolFraction, levelCap);
+        itemPickerNum = applyBlueprintBonusPicks(itemPickerNum, picker.getItems().size(), luckyCategory);
         for (int i = 0; i < itemPickerNum; i++) {
-            if (!randomFighterPicker.isEmpty()) {
-                String itemID = randomFighterPicker.pickAndRemove();
-                // Only need 1 of each Blueprint
-                // log.info("Trying to add Fighter blueprint for " + itemID);
-                cargo.addSpecial(new SpecialItemData(Items.FIGHTER_BP, itemID), 1);
+            if (!picker.isEmpty()) {
+                String itemID = picker.pickAndRemove();
+                cargo.addSpecial(new SpecialItemData(blueprintItemId, itemID), 1);
             }
         }
     }
 
-    protected void addShipsBlueprints() {
-        CargoAPI cargo = getCargo();
-        List<ShipHullSpecAPI> hullSpecs = Global.getSettings().getAllShipHullSpecs();
-        WeightedRandomPicker<String> randomHullPicker = new WeightedRandomPicker<>(itemGenRandom);
+    private int rollSpecialItemQuantity() {
+        if (isLuckyCategory(LUCKY_CATEGORY_SPECIAL)) {
+            if (techMarketLevel >= 5 && itemGenRandom.nextFloat() < cfg().luckySpecialQty3ChanceAtLevel5) {
+                return 3;
+            }
+            if (itemGenRandom.nextFloat() < cfg().luckySpecialQty2Chance) {
+                return 2;
+            }
+            return 1;
+        }
+        if (techMarketLevel >= cfg().specialQty2MinLevel && itemGenRandom.nextFloat() < cfg().specialQty2Chance) {
+            return 2;
+        }
+        return 1;
+    }
 
-        for (ShipHullSpecAPI spec : hullSpecs) {
-            // Check if this is not a blueprint that should drop etc
-            if (!spec.hasTag("rare_bp") || spec.hasTag(Tags.NO_DROP) || spec.hasTag(Tags.NO_BP_DROP)) {
+    private void ensureItemPoolsBuilt() {
+        int requiredMinPrice = cfg().moddedAiCoreMinBasePrice;
+        synchronized (ITEM_POOL_LOCK) {
+            boolean needsRebuild = cachedSpecialItemIds == null
+                    || cachedWeaponBlueprintIds == null
+                    || cachedFighterBlueprintIds == null
+                    || cachedShipBlueprintIds == null
+                    || cachedModdedAiCoreCandidates == null
+                    || cachedModdedAiCoreMinBasePrice != requiredMinPrice;
+            if (!needsRebuild) {
+                return;
+            }
+
+            cachedSpecialItemIds = buildSpecialItemPool();
+            cachedWeaponBlueprintIds = buildWeaponBlueprintPool();
+            cachedFighterBlueprintIds = buildFighterBlueprintPool();
+            cachedShipBlueprintIds = buildShipBlueprintPool();
+            cachedModdedAiCoreCandidates = buildModdedAiCoreCandidatePool(requiredMinPrice);
+            cachedModdedAiCoreMinBasePrice = requiredMinPrice;
+        }
+    }
+
+    private List<String> buildSpecialItemPool() {
+        Set<String> specialItemIds = new HashSet<String>();
+        for (SpecialItemSpecAPI spec : Global.getSettings().getAllSpecialItemSpecs()) {
+            if (spec == null) {
                 continue;
             }
-            // Check if player already knows this weapon?
-            // if (Global.getSector().getPlayerFaction().knowsWeapon(spec.getWeaponId())) {
-            // continue;
-            // }
-            // Add the data to our picker
-            randomHullPicker.add(spec.getHullId());
-        }
-
-        // Now make our Blueprints
-        int itemPickerNum = getPicksFromPool(randomHullPicker.getItems().size(), cfg().blueprintPoolFraction,
-                cfg().blueprintMaxShips[techMarketLevel - 1]);
-        itemPickerNum = applyBlueprintBonusPicks(itemPickerNum, randomHullPicker.getItems().size(),
-                LUCKY_CATEGORY_SHIP_BPS);
-        // log.info("randomHullPicker has " + randomHullPicker.getItems().size());
-        // log.info("num picked for hulls is " + itemPickerNum);
-        for (int i = 0; i < itemPickerNum; i++) {
-            if (!randomHullPicker.isEmpty()) {
-                String itemID = randomHullPicker.pickAndRemove();
-                // Only need 1 of each Blueprint
-                // log.info("Trying to add Hull blueprint for " + itemID);
-                cargo.addSpecial(new SpecialItemData(Items.SHIP_BP, itemID), 1);
+            boolean hasVanillaTag = false;
+            for (String tag : VANILLA_SPECIAL_ITEM_TAGS) {
+                if (spec.hasTag(tag)) {
+                    hasVanillaTag = true;
+                    break;
+                }
+            }
+            if (hasVanillaTag || DIY_PLANETS_SPECIAL_ITEM_IDS.contains(spec.getId())) {
+                specialItemIds.add(spec.getId());
             }
         }
+        return new ArrayList<String>(specialItemIds);
+    }
 
+    private List<String> buildWeaponBlueprintPool() {
+        List<String> ids = new ArrayList<String>();
+        for (WeaponSpecAPI spec : Global.getSettings().getAllWeaponSpecs()) {
+            if (spec.hasTag("rare_bp") && !spec.hasTag(Tags.NO_DROP) && !spec.hasTag(Tags.NO_BP_DROP)) {
+                ids.add(spec.getWeaponId());
+            }
+        }
+        return ids;
+    }
+
+    private List<String> buildFighterBlueprintPool() {
+        List<String> ids = new ArrayList<String>();
+        for (FighterWingSpecAPI spec : Global.getSettings().getAllFighterWingSpecs()) {
+            if (spec.hasTag("rare_bp") && !spec.hasTag(Tags.NO_DROP) && !spec.hasTag(Tags.NO_BP_DROP)) {
+                ids.add(spec.getId());
+            }
+        }
+        return ids;
+    }
+
+    private List<String> buildShipBlueprintPool() {
+        List<String> ids = new ArrayList<String>();
+        for (ShipHullSpecAPI spec : Global.getSettings().getAllShipHullSpecs()) {
+            if (spec.hasTag("rare_bp") && !spec.hasTag(Tags.NO_DROP) && !spec.hasTag(Tags.NO_BP_DROP)) {
+                ids.add(spec.getHullId());
+            }
+        }
+        return ids;
+    }
+
+    private List<ModdedAiCoreCandidate> buildModdedAiCoreCandidatePool(int minBasePrice) {
+        List<ModdedAiCoreCandidate> ids = new ArrayList<ModdedAiCoreCandidate>();
+        for (CommoditySpecAPI spec : Global.getSettings().getAllCommoditySpecs()) {
+            boolean isAiCoreLike = spec.hasTag(Commodities.TAG_AI_CORE)
+                    || Commodities.AI_CORES.equals(spec.getDemandClass());
+            if (!isAiCoreLike) {
+                continue;
+            }
+            if (Commodities.AI_CORES.equals(spec.getId())
+                    || Commodities.GAMMA_CORE.equals(spec.getId())
+                    || Commodities.BETA_CORE.equals(spec.getId())
+                    || Commodities.ALPHA_CORE.equals(spec.getId())
+                    || Commodities.OMEGA_CORE.equals(spec.getId())) {
+                continue;
+            }
+            if (spec.isMeta()) {
+                continue;
+            }
+            if (spec.hasTag(Tags.NO_DROP)) {
+                continue;
+            }
+            if (spec.hasTag("no_sell") || spec.hasTag("restricted") || spec.hasTag("hide_in_codex")) {
+                continue;
+            }
+            if (spec.getBasePrice() < minBasePrice) {
+                continue;
+            }
+            ids.add(new ModdedAiCoreCandidate(spec.getId(), Math.max(1f, spec.getBasePrice())));
+        }
+        return ids;
+    }
+
+    private int getLevelValue(int[] values, int fallback) {
+        if (values == null || values.length == 0) {
+            return fallback;
+        }
+        int levelIndex = Math.max(0, Math.min(techMarketLevel - 1, values.length - 1));
+        return values[levelIndex];
+    }
+
+    private float getLevelValue(float[] values, float fallback) {
+        if (values == null || values.length == 0) {
+            return fallback;
+        }
+        int levelIndex = Math.max(0, Math.min(techMarketLevel - 1, values.length - 1));
+        return values[levelIndex];
     }
 
     // ==========================================================================
@@ -382,8 +452,11 @@ public class TechMarket extends BaseSubmarketPlugin {
     @Override
     public float getTariff() {
         migrateProgressionDataIfNeeded();
-        RepLevel chicken_repLevel = Global.getSector().getImportantPeople().getPerson(ChickenQuestUtils.PERSON_CHICKEN)
-                .getRelToPlayer().getLevel();
+        PersonAPI chicken = ChickenQuestUtils.getChickenOrNull();
+        if (chicken == null) {
+            return cfg().tariffNeutral;
+        }
+        RepLevel chicken_repLevel = chicken.getRelToPlayer().getLevel();
         float mult;
         switch (chicken_repLevel) {
             case NEUTRAL:
@@ -411,8 +484,8 @@ public class TechMarket extends BaseSubmarketPlugin {
         if (poolSize <= 0) {
             return 0;
         }
-        int levelIndex = techMarketLevel - 1;
-        int byFraction = Math.max(1, Math.round(poolSize * progressionFraction[levelIndex]));
+        float levelFraction = Math.max(0f, getLevelValue(progressionFraction, 0f));
+        int byFraction = Math.max(1, Math.round(poolSize * levelFraction));
         return Math.min(byFraction, levelCap);
     }
 
@@ -420,10 +493,8 @@ public class TechMarket extends BaseSubmarketPlugin {
         if (poolSize <= 0) {
             return 0;
         }
-        int levelIndex = techMarketLevel - 1;
-        int hardCap = Math.max(1, cfg().specialItemMaxTotal[levelIndex]);
+        int hardCap = Math.max(1, getLevelValue(cfg().specialItemMaxTotal, 1));
 
-        // Keep assortment varied without tying count to total pool size.
         int floor = hardCap;
         if (techMarketLevel >= 2) {
             floor = Math.max(1, hardCap - 1);
@@ -433,9 +504,11 @@ public class TechMarket extends BaseSubmarketPlugin {
             picks += itemGenRandom.nextInt(hardCap - floor + 1);
         }
 
-        // Lucky special restock guarantees reaching cap, but does not exceed it.
         if (isLuckyCategory(LUCKY_CATEGORY_SPECIAL)) {
-            picks = hardCap;
+            int luckyBonus = techMarketLevel >= cfg().luckySpecialHighLevelThreshold
+                    ? cfg().luckySpecialExtraPicksHighLevel
+                    : cfg().luckySpecialExtraPicksLowLevel;
+            picks = hardCap + Math.max(0, luckyBonus);
         }
 
         return Math.min(poolSize, picks);
@@ -447,9 +520,9 @@ public class TechMarket extends BaseSubmarketPlugin {
         }
         int minBonus = 0;
         int maxBonus = 0;
-        if (techMarketLevel >= 4) {
-            minBonus = 1;
-            maxBonus = 2;
+        if (techMarketLevel >= cfg().blueprintBonusUnlockLevel) {
+            minBonus = cfg().blueprintBonusBaseMin;
+            maxBonus = cfg().blueprintBonusBaseMax;
         }
         if (isLuckyCategory(luckyCategory)) {
             minBonus += cfg().luckyBpBonusExtraMin;
@@ -483,7 +556,7 @@ public class TechMarket extends BaseSubmarketPlugin {
     }
 
     private int rollLuckyCategory() {
-        return itemGenRandom.nextInt(5) + 1;
+        return itemGenRandom.nextInt(LUCKY_CATEGORY_SHIP_BPS) + 1;
     }
 
     private void addRandomModdedAICore(CargoAPI cargo) {
@@ -491,36 +564,19 @@ public class TechMarket extends BaseSubmarketPlugin {
             return;
         }
 
-        WeightedRandomPicker<String> picker = new WeightedRandomPicker<>(itemGenRandom);
-        for (CommoditySpecAPI spec : Global.getSettings().getAllCommoditySpecs()) {
-            boolean isAiCoreLike = spec.hasTag(Commodities.TAG_AI_CORE)
-                    || Commodities.AI_CORES.equals(spec.getDemandClass());
-            if (!isAiCoreLike) {
-                continue;
-            }
-            if (Commodities.AI_CORES.equals(spec.getId())
-                    || Commodities.GAMMA_CORE.equals(spec.getId())
-                    || Commodities.BETA_CORE.equals(spec.getId())
-                    || Commodities.ALPHA_CORE.equals(spec.getId())
-                    || Commodities.OMEGA_CORE.equals(spec.getId())) {
-                continue;
-            }
-            if (spec.isMeta()) {
-                continue;
-            }
-            if (spec.hasTag(Tags.NO_DROP)) {
-                continue;
-            }
-            if (spec.hasTag("no_sell") || spec.hasTag("restricted") || spec.hasTag("hide_in_codex")) {
-                continue;
-            }
-            if (spec.getBasePrice() < cfg().moddedAiCoreMinBasePrice) {
-                continue;
-            }
+        List<ModdedAiCoreCandidate> candidates;
+        synchronized (ITEM_POOL_LOCK) {
+            candidates = cachedModdedAiCoreCandidates;
+        }
+        if (candidates == null || candidates.isEmpty()) {
+            return;
+        }
 
-            float price = Math.max(1f, spec.getBasePrice());
+        WeightedRandomPicker<String> picker = new WeightedRandomPicker<>(itemGenRandom);
+        for (ModdedAiCoreCandidate candidate : candidates) {
+            float price = Math.max(1f, candidate.basePrice);
             float weight = (float) (1d / Math.pow(price, cfg().moddedAiCorePriceWeightExponent));
-            picker.add(spec.getId(), Math.max(0.0001f, weight));
+            picker.add(candidate.commodityId, Math.max(0.0001f, weight));
         }
 
         if (picker.isEmpty()) {
@@ -623,7 +679,6 @@ public class TechMarket extends BaseSubmarketPlugin {
             if (priceMult <= 1f) {
                 continue;
             }
-
             float baseValuePerUnit = getStackBaseValuePerUnit(stack);
             if (baseValuePerUnit <= 0f) {
                 continue;

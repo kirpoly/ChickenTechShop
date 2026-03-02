@@ -6,6 +6,12 @@ cts_level_cost_3,Level 4 Cost,Int,900000,,"Credits needed to go from Tech Market
 cts_level_cost_4,Level 5 Cost,Int,1400000,,"Credits needed to go from Tech Market level 4 to 5.",10000,12000000,Chicken Tech Shop
 cts_mission_credit_mult,Mission Credit Multiplier,Double,0.35,,"Fraction of mission reward converted to Tech Market progression credits.",0,2,Chicken Tech Shop
 cts_spending_credit_mult,Spending Credit Multiplier,Double,0.25,,"Fraction of paid restock cost converted to Tech Market progression credits.",0,2,Chicken Tech Shop
+cts_restock_interval_days,Restock Interval Days,Int,30,,"Days between automatic Tech Market restocks.",1,120,Chicken Tech Shop
+cts_special_qty2_min_level,Special Qty2 Min Level,Int,4,,"Minimum Tech Market level where normal restocks can roll quantity 2 for special items.",1,5,Chicken Tech Shop
+cts_special_qty2_chance,Special Qty2 Chance,Double,0.35,,"Chance for normal restocks to roll quantity 2 for special items at/after the min level.",0,1,Chicken Tech Shop
+cts_bp_bonus_unlock_level,BP Bonus Unlock Level,Int,4,,"Tech Market level where base blueprint bonus picks unlock.",1,5,Chicken Tech Shop
+cts_bp_bonus_base_min,BP Bonus Base Min,Int,1,,"Minimum blueprint bonus picks once unlocked.",0,10,Chicken Tech Shop
+cts_bp_bonus_base_max,BP Bonus Base Max,Int,2,,"Maximum blueprint bonus picks once unlocked.",0,10,Chicken Tech Shop
 ,,,,,,,,
 cts_header_pricing,Pricing,Header,Submarket Pricing,,,,,Chicken Tech Shop
 cts_tariff_neutral,Tariff Neutral,Double,4.0,,"Tariff value at neutral reputation.",0,8,Chicken Tech Shop
@@ -26,3 +32,5 @@ cts_header_lucky,Premium Restock,Header,Lucky Restock,,,,,Chicken Tech Shop
 cts_lucky_min_level,Restock Unlock Level,Int,2,,"Minimum Tech Market level required before paid restock option appears.",1,5,Chicken Tech Shop
 cts_lucky_price_mean,Restock Price Mean,Int,200000,,"Average credit price for paid restock offers.",10000,2000000,Chicken Tech Shop
 cts_lucky_price_std,Restock Price StdDev,Int,50000,,"Standard deviation for paid restock price rolls.",0,1000000,Chicken Tech Shop
+cts_lucky_price_floor,Restock Price Floor,Int,25000,,"Minimum possible paid restock price after rolling.",0,2000000,Chicken Tech Shop
+cts_lucky_special_high_level_threshold,Lucky Special High-Level Threshold,Int,4,,"Tech Market level where lucky special restocks switch to high-level extra picks.",1,5,Chicken Tech Shop

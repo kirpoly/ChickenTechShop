@@ -92,16 +92,21 @@ public class TechMarketContact extends ContactIntel {
         }
 
         // Tech Market Info
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
-        TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
-        info.addPara(
-                person.getNameString() + " owns a Tech Market " + market.getOnOrAt() + " " + market.getName() + ".",
-                5f);
-        info.addPara("The Tech Market is currently at Level " + submarket.getTechMarketLevel() + ".", 5f, h,
-                "Level " + submarket.getTechMarketLevel());
-        if (submarket.getTechMarketLevel() < 5) {
-            info.addPara(submarket.ToNextLevelCreditsString() + " Credits to next level", 5f, h,
-                    submarket.ToNextLevelCreditsString() + " Credits");
+        MarketAPI chickenMarket = ChickenQuestUtils.getChickenMarketOrNull();
+        TechMarket submarket = ChickenQuestUtils.getChickenTechMarketOrNull();
+        if (chickenMarket != null && submarket != null) {
+            info.addPara(
+                    person.getNameString() + " owns a Tech Market " + chickenMarket.getOnOrAt() + " "
+                            + chickenMarket.getName() + ".",
+                    5f);
+            info.addPara("The Tech Market is currently at Level " + submarket.getTechMarketLevel() + ".", 5f, h,
+                    "Level " + submarket.getTechMarketLevel());
+            if (submarket.getTechMarketLevel() < 5) {
+                info.addPara(submarket.ToNextLevelCreditsString() + " Credits to next level", 5f, h,
+                        submarket.ToNextLevelCreditsString() + " Credits");
+            }
+        } else {
+            info.addPara("Chicken's Tech Market is currently unavailable.", 5f);
         }
 
         long ts = BaseMissionHub.getLastOpenedTimestamp(person);

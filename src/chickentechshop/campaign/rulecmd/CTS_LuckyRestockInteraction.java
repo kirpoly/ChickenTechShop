@@ -51,11 +51,10 @@ public class CTS_LuckyRestockInteraction extends BaseCommandPlugin {
     }
 
     private boolean canShow(int requiredLevel) {
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
-        if (market == null || !market.hasSubmarket("chicken_market")) {
+        TechMarket submarket = ChickenQuestUtils.getChickenTechMarketOrNull();
+        if (submarket == null) {
             return false;
         }
-        TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
         return submarket.getTechMarketLevel() >= requiredLevel;
     }
 
@@ -89,13 +88,11 @@ public class CTS_LuckyRestockInteraction extends BaseCommandPlugin {
             return true;
         }
 
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
-        if (market == null || !market.hasSubmarket("chicken_market")) {
+        TechMarket submarket = ChickenQuestUtils.getChickenTechMarketOrNull();
+        if (submarket == null) {
             text.addPara("Chicken can't access the tech market right now.");
             return true;
         }
-
-        TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
         if (submarket.getTechMarketLevel() < CTS_Config.get().luckyRestockMinLevel) {
             text.addPara("Chicken isn't ready to run premium restocks yet.");
             return true;
@@ -121,7 +118,7 @@ public class CTS_LuckyRestockInteraction extends BaseCommandPlugin {
     }
 
     private int getOrCreateStoredPrice() {
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
+        MarketAPI market = ChickenQuestUtils.getChickenMarketOrNull();
         CTS_Config cfg = CTS_Config.get();
         if (market == null) {
             return cfg.luckyPriceMean;
@@ -169,7 +166,7 @@ public class CTS_LuckyRestockInteraction extends BaseCommandPlugin {
     }
 
     private void clearStoredPrice() {
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
+        MarketAPI market = ChickenQuestUtils.getChickenMarketOrNull();
         if (market == null) {
             return;
         }

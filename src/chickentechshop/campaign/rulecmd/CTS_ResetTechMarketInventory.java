@@ -23,8 +23,10 @@ public class CTS_ResetTechMarketInventory extends BaseCommandPlugin {
         if (dialog == null) {
             return false;
         }
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
-        TechMarket submarket = (TechMarket) market.getSubmarket("chicken_market").getPlugin();
+        TechMarket submarket = ChickenQuestUtils.getChickenTechMarketOrNull();
+        if (submarket == null) {
+            return false;
+        }
         submarket.updateCargoForce();
 
         return true;

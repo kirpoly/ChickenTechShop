@@ -21,10 +21,16 @@ public class CTS_Config {
     public float spendingCreditContribution = 0.25f;
 
     public int[] specialItemMaxTotal = { 1, 2, 2, 3, 4 };
+    public int restockIntervalDays = 30;
+    public int specialQty2MinLevel = 4;
+    public float specialQty2Chance = 0.35f;
     public float[] blueprintPoolFraction = { 0.02f, 0.04f, 0.06f, 0.08f, 0.10f };
     public int[] blueprintMaxWeapons = { 2, 3, 4, 5, 6 };
     public int[] blueprintMaxFighters = { 1, 2, 3, 4, 5 };
     public int[] blueprintMaxShips = { 1, 2, 2, 3, 4 };
+    public int blueprintBonusUnlockLevel = 4;
+    public int blueprintBonusBaseMin = 1;
+    public int blueprintBonusBaseMax = 2;
 
     public int[] aiGammaBase = { 2, 4, 6, 8, 8 };
     public int[] aiBetaBase = { 1, 2, 3, 4, 4 };
@@ -54,6 +60,7 @@ public class CTS_Config {
     public int luckyPriceFloor = 25000;
     public int luckySpecialExtraPicksLowLevel = 1;
     public int luckySpecialExtraPicksHighLevel = 2;
+    public int luckySpecialHighLevelThreshold = 4;
     public float luckySpecialQty2Chance = 0.75f;
     public float luckySpecialQty3ChanceAtLevel5 = 0.20f;
     public int luckyCoreBonusPerUnlockedTier = 1;
@@ -82,10 +89,16 @@ public class CTS_Config {
             spendingCreditContribution = readFloat(json, "spending_credit_contribution", spendingCreditContribution);
 
             specialItemMaxTotal = readIntArray(json, "special_item_max_total", specialItemMaxTotal);
+            restockIntervalDays = readInt(json, "restock_interval_days", restockIntervalDays);
+            specialQty2MinLevel = readInt(json, "special_qty2_min_level", specialQty2MinLevel);
+            specialQty2Chance = readFloat(json, "special_qty2_chance", specialQty2Chance);
             blueprintPoolFraction = readFloatArray(json, "blueprint_pool_fraction", blueprintPoolFraction);
             blueprintMaxWeapons = readIntArray(json, "blueprint_max_weapons", blueprintMaxWeapons);
             blueprintMaxFighters = readIntArray(json, "blueprint_max_fighters", blueprintMaxFighters);
             blueprintMaxShips = readIntArray(json, "blueprint_max_ships", blueprintMaxShips);
+            blueprintBonusUnlockLevel = readInt(json, "blueprint_bonus_unlock_level", blueprintBonusUnlockLevel);
+            blueprintBonusBaseMin = readInt(json, "blueprint_bonus_base_min", blueprintBonusBaseMin);
+            blueprintBonusBaseMax = readInt(json, "blueprint_bonus_base_max", blueprintBonusBaseMax);
 
             aiGammaBase = readIntArray(json, "ai_gamma_base", aiGammaBase);
             aiBetaBase = readIntArray(json, "ai_beta_base", aiBetaBase);
@@ -118,6 +131,8 @@ public class CTS_Config {
                     luckySpecialExtraPicksLowLevel);
             luckySpecialExtraPicksHighLevel = readInt(json, "lucky_special_extra_picks_high_level",
                     luckySpecialExtraPicksHighLevel);
+            luckySpecialHighLevelThreshold = readInt(json, "lucky_special_high_level_threshold",
+                    luckySpecialHighLevelThreshold);
             luckySpecialQty2Chance = readFloat(json, "lucky_special_qty2_chance", luckySpecialQty2Chance);
             luckySpecialQty3ChanceAtLevel5 = readFloat(json, "lucky_special_qty3_chance_level5",
                     luckySpecialQty3ChanceAtLevel5);
@@ -143,6 +158,12 @@ public class CTS_Config {
 
         missionCreditContribution = getLunaFloat("cts_mission_credit_mult", missionCreditContribution, lunaJson);
         spendingCreditContribution = getLunaFloat("cts_spending_credit_mult", spendingCreditContribution, lunaJson);
+        restockIntervalDays = getLunaInt("cts_restock_interval_days", restockIntervalDays, lunaJson);
+        specialQty2MinLevel = getLunaInt("cts_special_qty2_min_level", specialQty2MinLevel, lunaJson);
+        specialQty2Chance = getLunaFloat("cts_special_qty2_chance", specialQty2Chance, lunaJson);
+        blueprintBonusUnlockLevel = getLunaInt("cts_bp_bonus_unlock_level", blueprintBonusUnlockLevel, lunaJson);
+        blueprintBonusBaseMin = getLunaInt("cts_bp_bonus_base_min", blueprintBonusBaseMin, lunaJson);
+        blueprintBonusBaseMax = getLunaInt("cts_bp_bonus_base_max", blueprintBonusBaseMax, lunaJson);
 
         tariffNeutral = getLunaFloat("cts_tariff_neutral", tariffNeutral, lunaJson);
         tariffFavorable = getLunaFloat("cts_tariff_favorable", tariffFavorable, lunaJson);
@@ -163,6 +184,9 @@ public class CTS_Config {
         luckyRestockMinLevel = getLunaInt("cts_lucky_min_level", luckyRestockMinLevel, lunaJson);
         luckyPriceMean = getLunaInt("cts_lucky_price_mean", luckyPriceMean, lunaJson);
         luckyPriceStd = getLunaInt("cts_lucky_price_std", luckyPriceStd, lunaJson);
+        luckyPriceFloor = getLunaInt("cts_lucky_price_floor", luckyPriceFloor, lunaJson);
+        luckySpecialHighLevelThreshold = getLunaInt("cts_lucky_special_high_level_threshold",
+                luckySpecialHighLevelThreshold, lunaJson);
         sanitize();
         log.info("Loaded Luna settings: source=" + (lunaJson != null ? "common-json" : "api-reflection")
                 + ", luckyPriceMean=" + luckyPriceMean
@@ -185,6 +209,12 @@ public class CTS_Config {
         for (int i = 0; i < specialItemMaxTotal.length; i++) {
             specialItemMaxTotal[i] = Math.max(1, specialItemMaxTotal[i]);
         }
+        restockIntervalDays = Math.max(1, restockIntervalDays);
+        specialQty2MinLevel = Math.max(1, Math.min(5, specialQty2MinLevel));
+        specialQty2Chance = clamp01(specialQty2Chance);
+        blueprintBonusUnlockLevel = Math.max(1, Math.min(5, blueprintBonusUnlockLevel));
+        blueprintBonusBaseMin = Math.max(0, blueprintBonusBaseMin);
+        blueprintBonusBaseMax = Math.max(blueprintBonusBaseMin, blueprintBonusBaseMax);
         aiCoreRandomDelta = Math.max(0, aiCoreRandomDelta);
         moddedAiCoreRestockChance = clamp01(moddedAiCoreRestockChance);
         moddedAiCorePriceWeightExponent = Math.max(0f, moddedAiCorePriceWeightExponent);
@@ -200,6 +230,9 @@ public class CTS_Config {
         luckyPriceMean = Math.max(0, luckyPriceMean);
         luckyPriceStd = Math.max(0, luckyPriceStd);
         luckyPriceFloor = Math.max(0, luckyPriceFloor);
+        luckySpecialExtraPicksLowLevel = Math.max(0, luckySpecialExtraPicksLowLevel);
+        luckySpecialExtraPicksHighLevel = Math.max(0, luckySpecialExtraPicksHighLevel);
+        luckySpecialHighLevelThreshold = Math.max(1, Math.min(5, luckySpecialHighLevelThreshold));
         luckySpecialQty2Chance = clamp01(luckySpecialQty2Chance);
         luckySpecialQty3ChanceAtLevel5 = clamp01(luckySpecialQty3ChanceAtLevel5);
         luckyBpBonusExtraMin = Math.max(0, luckyBpBonusExtraMin);

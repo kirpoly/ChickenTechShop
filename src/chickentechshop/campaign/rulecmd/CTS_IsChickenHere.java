@@ -24,9 +24,20 @@ public class CTS_IsChickenHere extends BaseCommandPlugin {
     @Override
     public boolean execute(final String ruleId, final InteractionDialogAPI dialog, final List<Misc.Token> params,
             final Map<String, MemoryAPI> memoryMap) {
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
+        MarketAPI market = ChickenQuestUtils.getChickenMarketOrNull();
+        if (market == null) {
+            return false;
+        }
 
-        String playerLocation = (String) memoryMap.get(MemKeys.LOCAL).get("$id");
+        MemoryAPI local = memoryMap.get(MemKeys.LOCAL);
+        if (local == null) {
+            return false;
+        }
+        Object playerLocationValue = local.get("$id");
+        if (!(playerLocationValue instanceof String)) {
+            return false;
+        }
+        String playerLocation = (String) playerLocationValue;
         String chickenLocation = market.getId();
 
         if (playerLocation.equals(chickenLocation)) {

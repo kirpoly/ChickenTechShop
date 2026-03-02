@@ -30,11 +30,19 @@ public class CTS_CreateSubmarketAndChickenContact extends BaseCommandPlugin {
         }
 
         // Add Chicken Submarket to wherever Chicken is
-        MarketAPI market = ChickenQuestUtils.getChickenMarket();
-        market.addSubmarket("chicken_market");
+        MarketAPI market = ChickenQuestUtils.getChickenMarketOrNull();
+        if (market == null) {
+            return false;
+        }
+        if (!market.hasSubmarket(ChickenQuestUtils.SUBMARKET_CHICKEN)) {
+            market.addSubmarket(ChickenQuestUtils.SUBMARKET_CHICKEN);
+        }
 
         // Add Chicken as a contact
-        PersonAPI chicken = Global.getSector().getImportantPeople().getPerson(ChickenQuestUtils.PERSON_CHICKEN);
+        PersonAPI chicken = ChickenQuestUtils.getChickenOrNull();
+        if (chicken == null) {
+            return false;
+        }
         market.getCommDirectory().addPerson(chicken);
         BaseMissionHub.set(chicken, new BaseMissionHub(chicken));
         chicken.getMemoryWithoutUpdate().set(BaseMissionHub.NUM_BONUS_MISSIONS, 1);
