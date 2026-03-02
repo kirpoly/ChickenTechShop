@@ -20,7 +20,7 @@ public class CTS_Config {
     public float missionCreditContribution = 0.35f;
     public float spendingCreditContribution = 0.25f;
 
-    public float[] specialItemPoolFraction = { 0.10f, 0.15f, 0.20f, 0.25f, 0.30f };
+    public int[] specialItemMaxTotal = { 1, 2, 2, 3, 4 };
     public float[] blueprintPoolFraction = { 0.02f, 0.04f, 0.06f, 0.08f, 0.10f };
     public int[] blueprintMaxWeapons = { 2, 3, 4, 5, 6 };
     public int[] blueprintMaxFighters = { 1, 2, 3, 4, 5 };
@@ -81,7 +81,7 @@ public class CTS_Config {
             missionCreditContribution = readFloat(json, "mission_credit_contribution", missionCreditContribution);
             spendingCreditContribution = readFloat(json, "spending_credit_contribution", spendingCreditContribution);
 
-            specialItemPoolFraction = readFloatArray(json, "special_item_pool_fraction", specialItemPoolFraction);
+            specialItemMaxTotal = readIntArray(json, "special_item_max_total", specialItemMaxTotal);
             blueprintPoolFraction = readFloatArray(json, "blueprint_pool_fraction", blueprintPoolFraction);
             blueprintMaxWeapons = readIntArray(json, "blueprint_max_weapons", blueprintMaxWeapons);
             blueprintMaxFighters = readIntArray(json, "blueprint_max_fighters", blueprintMaxFighters);
@@ -182,6 +182,9 @@ public class CTS_Config {
         }
         missionCreditContribution = Math.max(0f, missionCreditContribution);
         spendingCreditContribution = Math.max(0f, spendingCreditContribution);
+        for (int i = 0; i < specialItemMaxTotal.length; i++) {
+            specialItemMaxTotal[i] = Math.max(1, specialItemMaxTotal[i]);
+        }
         aiCoreRandomDelta = Math.max(0, aiCoreRandomDelta);
         moddedAiCoreRestockChance = clamp01(moddedAiCoreRestockChance);
         moddedAiCorePriceWeightExponent = Math.max(0f, moddedAiCorePriceWeightExponent);

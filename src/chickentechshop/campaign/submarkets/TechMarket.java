@@ -38,14 +38,14 @@ public class TechMarket extends BaseSubmarketPlugin {
     public static Logger log = Global.getLogger(TechMarket.class);
     private static final int PROGRESSION_DATA_VERSION = 2;
     private static final int[] LEVEL_COSTS_LEGACY = { 100000, 150000, 200000, 250000 };
-    private static final int[] LEVEL_COSTS_CURRENT = { 250000, 500000, 900000, 1400000 };
+    private static final int[] LEVEL_COSTS_BOOTSTRAP = { 250000, 500000, 900000, 1400000 };
 
     private int techMarketLevel = 1;
     private int currentCredits = 0;
     private int luckyRestockCharges = 0;
     private int queuedLuckyCategory = LUCKY_CATEGORY_NONE;
     private transient int activeLuckyCategory = LUCKY_CATEGORY_NONE;
-    private int[] levelCosts = LEVEL_COSTS_CURRENT.clone();
+    private int[] levelCosts = LEVEL_COSTS_BOOTSTRAP.clone();
     private int progressionDataVersion = PROGRESSION_DATA_VERSION;
     private static final int LUCKY_CATEGORY_NONE = 0;
     private static final int LUCKY_CATEGORY_SPECIAL = 1;
@@ -150,6 +150,7 @@ public class TechMarket extends BaseSubmarketPlugin {
         CargoAPI cargo = getCargo();
         Set<String> vanillaSpecialItemsList = new HashSet<String>();
         Set<String> diyPlanetsSpecialItemsList = new HashSet<String>();
+        Set<String> allSpecialItems = new HashSet<String>();
         final List<String> vanillaItemTags = Arrays.asList("pather4", "hist3t");
         final List<String> diyPlanetsItemIDs = Arrays.asList(
                 "atmo_mineralizer", "atmo_sublimator", "solar_reflector",
@@ -172,49 +173,19 @@ public class TechMarket extends BaseSubmarketPlugin {
                 diyPlanetsSpecialItemsList.add(spec.getId());
             }
         }
+        allSpecialItems.addAll(vanillaSpecialItemsList);
+        allSpecialItems.addAll(diyPlanetsSpecialItemsList);
 
-        // Now Pick based on the techMarketLevel
-        // Take random 20% of total items per market level
-        // Use 20% of each list for more even distribution
-        // Quantity is random number from 1 to market level
-        // Make our random picker list
-        WeightedRandomPicker<String> randomVanillaPicker = new WeightedRandomPicker<>(itemGenRandom);
-        WeightedRandomPicker<String> randomDIYPicker = new WeightedRandomPicker<>(itemGenRandom);
-        for (String itemId : vanillaSpecialItemsList) {
-            randomVanillaPicker.add(itemId);
-        }
-        for (String itemId : diyPlanetsSpecialItemsList) {
-            randomDIYPicker.add(itemId);
+        WeightedRandomPicker<String> randomSpecialPicker = new WeightedRandomPicker<>(itemGenRandom);
+        for (String itemId : allSpecialItems) {
+            randomSpecialPicker.add(itemId);
         }
 
-        int totalItems = randomVanillaPicker.getItems().size() + randomDIYPicker.getItems().size();
-
-        // Then add the items
-        int itemPickerNum = getPicksFromPool(totalItems, cfg().specialItemPoolFraction, totalItems);
-        if (isLuckyCategory(LUCKY_CATEGORY_SPECIAL)) {
-            int luckyExtraPicks = techMarketLevel >= 4 ? cfg().luckySpecialExtraPicksHighLevel
-                    : cfg().luckySpecialExtraPicksLowLevel;
-            itemPickerNum = Math.min(totalItems, itemPickerNum + luckyExtraPicks);
-        }
+        int totalItems = randomSpecialPicker.getItems().size();
+        int itemPickerNum = getSpecialItemPickCount(totalItems);
         for (int i = 0; i < itemPickerNum; i++) {
-            if (!randomVanillaPicker.isEmpty()) {
-                String itemID = randomVanillaPicker.pickAndRemove();
-                int quantity = 1;
-                if (isLuckyCategory(LUCKY_CATEGORY_SPECIAL)) {
-                    if (itemGenRandom.nextFloat() < cfg().luckySpecialQty2Chance) {
-                        quantity = 2;
-                    }
-                    if (techMarketLevel >= 5 && itemGenRandom.nextFloat() < cfg().luckySpecialQty3ChanceAtLevel5) {
-                        quantity = 3;
-                    }
-                } else if (techMarketLevel >= 4 && itemGenRandom.nextFloat() < 0.35f) {
-                    quantity = 2;
-                }
-                log.info("Trying to add " + itemID + " with quantity " + quantity);
-                cargo.addSpecial(new SpecialItemData(itemID, null), quantity);
-            }
-            if (!randomDIYPicker.isEmpty()) {
-                String itemID = randomDIYPicker.pickAndRemove();
+            if (!randomSpecialPicker.isEmpty()) {
+                String itemID = randomSpecialPicker.pickAndRemove();
                 int quantity = 1;
                 if (isLuckyCategory(LUCKY_CATEGORY_SPECIAL)) {
                     if (itemGenRandom.nextFloat() < cfg().luckySpecialQty2Chance) {
@@ -445,6 +416,31 @@ public class TechMarket extends BaseSubmarketPlugin {
         return Math.min(byFraction, levelCap);
     }
 
+    private int getSpecialItemPickCount(int poolSize) {
+        if (poolSize <= 0) {
+            return 0;
+        }
+        int levelIndex = techMarketLevel - 1;
+        int hardCap = Math.max(1, cfg().specialItemMaxTotal[levelIndex]);
+
+        // Keep assortment varied without tying count to total pool size.
+        int floor = hardCap;
+        if (techMarketLevel >= 2) {
+            floor = Math.max(1, hardCap - 1);
+        }
+        int picks = floor;
+        if (hardCap > floor) {
+            picks += itemGenRandom.nextInt(hardCap - floor + 1);
+        }
+
+        // Lucky special restock guarantees reaching cap, but does not exceed it.
+        if (isLuckyCategory(LUCKY_CATEGORY_SPECIAL)) {
+            picks = hardCap;
+        }
+
+        return Math.min(poolSize, picks);
+    }
+
     private int applyBlueprintBonusPicks(int basePicks, int poolSize, int luckyCategory) {
         if (poolSize <= 0) {
             return 0;
@@ -548,33 +544,53 @@ public class TechMarket extends BaseSubmarketPlugin {
 
     private void migrateProgressionDataIfNeeded() {
         int[] configuredCosts = cfg().levelCosts;
-        if (progressionDataVersion >= PROGRESSION_DATA_VERSION) {
-            if (!Arrays.equals(levelCosts, configuredCosts)) {
-                levelCosts = configuredCosts.clone();
-            }
-            return;
+        if (configuredCosts == null || configuredCosts.length == 0) {
+            configuredCosts = LEVEL_COSTS_BOOTSTRAP;
         }
 
         int levelIndex = Math.max(0, Math.min(getTechMarketLevel() - 1, configuredCosts.length - 1));
-        int oldCostForLevel = LEVEL_COSTS_LEGACY[levelIndex];
-        if (levelCosts != null && levelCosts.length > levelIndex && levelCosts[levelIndex] > 0) {
-            oldCostForLevel = levelCosts[levelIndex];
+
+        if (progressionDataVersion < PROGRESSION_DATA_VERSION) {
+            int[] sourceCosts = levelCosts;
+            // If old saves don't have serialized costs and got class defaults, prefer known legacy ladder.
+            if (sourceCosts == null || sourceCosts.length <= levelIndex || Arrays.equals(sourceCosts, LEVEL_COSTS_BOOTSTRAP)) {
+                sourceCosts = LEVEL_COSTS_LEGACY;
+            }
+            remapProgressCreditsForCostChange(costAt(sourceCosts, levelIndex, LEVEL_COSTS_LEGACY[levelIndex]),
+                    costAt(configuredCosts, levelIndex, LEVEL_COSTS_BOOTSTRAP[levelIndex]));
+            levelCosts = configuredCosts.clone();
+            progressionDataVersion = PROGRESSION_DATA_VERSION;
+            return;
         }
-        int newCostForLevel = configuredCosts[levelIndex];
+
+        // Settings changed in JSON/Luna for an existing save: preserve same progression ratio.
+        if (!Arrays.equals(levelCosts, configuredCosts)) {
+            remapProgressCreditsForCostChange(costAt(levelCosts, levelIndex, configuredCosts[levelIndex]),
+                    costAt(configuredCosts, levelIndex, LEVEL_COSTS_BOOTSTRAP[levelIndex]));
+            levelCosts = configuredCosts.clone();
+        }
+    }
+
+    private int costAt(int[] costs, int levelIndex, int fallback) {
+        if (costs == null || levelIndex < 0 || levelIndex >= costs.length || costs[levelIndex] <= 0) {
+            return Math.max(1, fallback);
+        }
+        return costs[levelIndex];
+    }
+
+    private void remapProgressCreditsForCostChange(int oldCostForLevel, int newCostForLevel) {
+        int safeOld = Math.max(1, oldCostForLevel);
+        int safeNew = Math.max(1, newCostForLevel);
 
         if (getTechMarketLevel() >= 5) {
             currentCredits = 0;
-        } else if (oldCostForLevel > 0) {
-            float progressRatio = currentCredits / (float) oldCostForLevel;
-            progressRatio = Math.max(0f, Math.min(1f, progressRatio));
-            currentCredits = Math.round(progressRatio * newCostForLevel);
-            currentCredits = Math.min(currentCredits, newCostForLevel - 1);
-        } else {
-            currentCredits = Math.max(0, Math.min(currentCredits, newCostForLevel - 1));
+            return;
         }
 
-        levelCosts = configuredCosts.clone();
-        progressionDataVersion = PROGRESSION_DATA_VERSION;
+        float progressRatio = currentCredits / (float) safeOld;
+        progressRatio = Math.max(0f, Math.min(1f, progressRatio));
+        currentCredits = Math.round(progressRatio * safeNew);
+        currentCredits = Math.max(0, Math.min(currentCredits, safeNew - 1));
     }
 
     @Override

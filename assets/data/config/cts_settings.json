@@ -3,7 +3,7 @@
   "mission_credit_contribution": 0.35,
   "spending_credit_contribution": 0.25,
 
-  "special_item_pool_fraction": [0.10, 0.15, 0.20, 0.25, 0.30],
+  "special_item_max_total": [1, 2, 2, 3, 4],
   "blueprint_pool_fraction": [0.02, 0.04, 0.06, 0.08, 0.10],
   "blueprint_max_weapons": [2, 3, 4, 5, 6],
   "blueprint_max_fighters": [1, 2, 3, 4, 5],
