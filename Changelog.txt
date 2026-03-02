@@ -1,4 +1,4 @@
-Version 0.1.6
+Version 0.2.0
     Changes:
         - Major tech market balance/progression rework with config-driven tuning (JSON + LunaLib support)
         - Added premium "Lucky Restock" interaction/dialog for Chicken
