@@ -8,6 +8,6 @@
     "gameVersion": "0.98a-RC5",
     "modPlugin": "chickentechshop.ChickenTechShop",
     "jars": [
-        "chickentechshop.jar"
+        "ChickenTechShop.jar"
     ]
 }
