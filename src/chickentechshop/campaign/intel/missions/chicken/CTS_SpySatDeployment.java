@@ -38,6 +38,8 @@ public class CTS_SpySatDeployment extends SpySatDeployment {
 	@Override
 	protected void notifyEnding() {
 		super.notifyEnding();
-		CTS_MissionRewards.applyRewardIfMissionSucceeded(this, creditReward);
+		if (isSucceeded()) {
+			CTS_MissionRewards.applyReward(creditReward);
+		}
 	}
 }

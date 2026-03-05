@@ -7,6 +7,8 @@ public class CTS_DeadDropMission extends DeadDropMission {
 	@Override
 	protected void notifyEnding() {
 		super.notifyEnding();
-		CTS_MissionRewards.applyRewardIfMissionSucceeded(this, creditReward);
+		if (isSucceeded()) {
+			CTS_MissionRewards.applyReward(creditReward);
+		}
 	}
 }
